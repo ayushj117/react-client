@@ -1,7 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
-  Avatar, Button, TextField, FormHelperText, IconButton, InputAdornment, Paper, Typography,
+  Avatar, Button, CircularProgress, TextField,
+  FormHelperText, IconButton, InputAdornment, Paper, Typography,
 } from '@material-ui/core';
 import {
   Visibility, VisibilityOff, Email,
@@ -9,6 +10,9 @@ import {
 import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import withStyles from '@material-ui/core/styles/withStyles';
 import * as yup from 'yup';
+import { callApi } from '../../lib/utils/api';
+import { SnackbarConsumer } from '../../contexts/SnackBarProvider/SnackBarProvider';
+
 
 const styles = theme => ({
   main: {
@@ -60,6 +64,8 @@ class Login extends React.Component {
     super(props);
     this.state = {
       showPassword: false,
+      loader: false,
+      snackCheck: false,
       form: {
         password: '',
         email: '',
@@ -151,6 +157,14 @@ getError = (field) => {
   return result;
 }
 
+showBooleanError = (field) => {
+  const { isTouched } = this.state;
+  if (isTouched[field] === true) {
+    return true;
+  }
+  return false;
+}
+
 buttonChecked = () => {
   const { isTouched } = this.state;
   let touched = 0;
@@ -174,9 +188,34 @@ handleClickShowPassword = () => {
   this.setState({ showPassword: !showPassword });
 };
 
+handleSubmit = async (e, values) => {
+  e.preventDefault();
+  const { form } = this.state;
+  this.setState({
+    loader: true,
+  });
+  const result = await callApi('post', form, 'user/login');
+  // eslint-disable-next-line react/prop-types
+  const { children } = this.props;
+  if (result.status) {
+    this.setState({
+      loader: false,
+    });
+    window.localStorage.setItem('token', result.data.data);
+    children.props.history.push('/trainee');
+  } else {
+    values.openSnack('Not Valid', 'error');
+    this.setState({
+      snackCheck: true,
+      loader: false,
+    });
+  }
+}
+
+
 render() {
   const { classes, ...rest } = this.props;
-  const { showPassword } = this.state;
+  const { showPassword, loader, snackCheck } = this.state;
   return (
     <>
       <main {...rest} className={classes.main}>
@@ -190,7 +229,7 @@ render() {
           <form className={classes.form}>
             <TextField
               fullWidth
-              error={this.getError('email')}
+              error={this.showBooleanError('email')}
               id="outlined-email-input"
               label="Email Address"
               className={classes.textField}
@@ -210,7 +249,7 @@ render() {
             </FormHelperText>
             <TextField
               fullWidth
-              error={this.getError('password')}
+              error={this.showBooleanError('password')}
               id="outlined-password-input"
               label="Password"
               className={classes.textField}
@@ -236,31 +275,30 @@ render() {
             <FormHelperText id="component-error-text3" className={classes.error}>
               {this.getError('password')}
             </FormHelperText>
-
             {
-              (this.buttonChecked()) ? (
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  className={classes.submit}
-                >
-                SIGN IN
-                </Button>
-              ) : (
-                <Button
-                  disabled
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  className={classes.submit}
-                >
-                SIGN IN
-                </Button>
-              )
+              <SnackbarConsumer>
+                {value => (
+                  <Button
+                    type="submit"
+                    fullWidth
+                    disabled={(!this.buttonChecked() || loader)}
+                    variant="contained"
+                    color="primary"
+                    className={classes.submit}
+                    onClick={(e) => {
+                      this.handleSubmit(e, value);
+                    }}
+                  >
+                    {
+                      (!loader || snackCheck)
+                        ? <b>SIGN IN</b>
+                        : <CircularProgress size={24} thickness={4} />
+                    }
+                  </Button>
+                )}
+              </SnackbarConsumer>
             }
+
           </form>
         </Paper>
       </main>

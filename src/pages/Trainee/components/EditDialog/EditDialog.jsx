@@ -3,15 +3,14 @@ import PropTypes from 'prop-types';
 import { withStyles } from '@material-ui/core/styles';
 import {
   Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText,
-  DialogTitle, TextField, FormHelperText, IconButton, InputAdornment,
+  DialogTitle, TextField, FormHelperText, InputAdornment,
 } from '@material-ui/core';
-import Grid from '@material-ui/core/Grid';
 import {
-  Person, Visibility, VisibilityOff, Email,
+  Person, Email,
 } from '@material-ui/icons';
 import * as yup from 'yup';
-import { callApi } from '../../../../lib/utils/api';
 import { SnackbarConsumer } from '../../../../contexts/SnackBarProvider/SnackBarProvider';
+import { callApi } from '../../../../lib/utils/api';
 
 
 const styles = theme => ({
@@ -26,19 +25,19 @@ const styles = theme => ({
 });
 
 const propTypes = {
-  open: PropTypes.bool,
+  editOpen: PropTypes.bool,
   onClose: PropTypes.func.isRequired,
   // eslint-disable-next-line react/forbid-prop-types
   classes: PropTypes.object,
   onSubmit: PropTypes.func.isRequired,
+  traineeData: PropTypes.objectOf(PropTypes.objectOf).isRequired,
 };
 
 // default values for props:
 const defaultProps = {
-  open: false,
+  editOpen: false,
   classes: {},
 };
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
 
 class AddDialog extends React.Component {
   schema = yup.object().shape({
@@ -46,33 +45,25 @@ class AddDialog extends React.Component {
       .string()
       .required(),
     email: yup.string().email().required(),
-    password: yup.string().matches(passwordRegex, 'Must contain 8 characters, at least one uppercase letter, one lowercase letter and one number').required(),
-    confirmPassword: yup.string()
-      .oneOf([yup.ref('password'), null], 'Passwords must match').required().label('confirm password'),
   });
 
   constructor(props) {
     super(props);
+    const { traineeData } = this.props;
+    const { name, email } = traineeData;
     this.state = {
-      showPassword: false,
       loader: false,
       snackCheck: false,
       form: {
-        name: '',
-        password: '',
-        email: '',
-        confirmPassword: '',
+        name,
+        email,
       },
       error: {
         name: '',
-        password: '',
-        confirmPassword: '',
         email: '',
       },
       isTouched: {
         name: false,
-        password: false,
-        confirmPassword: false,
         email: false,
       },
     };
@@ -139,7 +130,7 @@ class AddDialog extends React.Component {
 
   hasError = () => {
     const { error } = this.state;
-    if (error.name === '' && error.email === '' && error.password === '' && error.confirmPassword === '') {
+    if (error.name === '' && error.email === '') {
       return false;
     }
     return true;
@@ -172,44 +163,46 @@ class AddDialog extends React.Component {
         touched += 1;
       }
     });
-    if (!checkError && touched === 4) {
+    if (!checkError && (touched === 2 || touched === 1)) {
       result = true;
-    } else if (checkError && touched !== 4) {
+    } else if (checkError && touched !== 2) {
       result = false;
     }
     return result;
   }
 
-  handleClickShowPassword = () => {
-    const { showPassword } = this.state;
-    this.setState({ showPassword: !showPassword });
-  };
 
-  handleSubmit = async (e, values) => {
+  handleSubmit = (e, value) => {
     e.preventDefault();
     const { form } = this.state;
+    const { name, email } = form;
     this.setState({
       loader: true,
     });
-    const { confirmPassword, ...rest } = form;
-    const result = await callApi('post', rest, 'trainee');
     // eslint-disable-next-line react/prop-types
-    const { onSubmit, history } = this.props;
-    console.log('inside add ', this.props);
-    if (result.status) {
-      this.setState({
-        loader: false,
-      });
-      values.openSnack(result.data.message, 'success');
-      history.push('/trainee');
-    } else {
-      values.openSnack('Not Authorized', 'error');
-      this.setState({
-        snackCheck: true,
-        loader: false,
-      });
-    }
-    onSubmit(form);
+    const { onSubmit, traineeData } = this.props;
+    callApi(
+      'PUT',
+      {
+        name, email, password: '', id: traineeData.originalId,
+      },
+      'trainee',
+      {},
+    ).then((result) => {
+      if (result.status) {
+        this.setState({
+          loader: false,
+        });
+        value.openSnack('Trainee edited!', 'success');
+        onSubmit(form);
+      } else {
+        value.openSnack(result.message, 'error');
+        this.setState({
+          snackCheck: true,
+          loader: false,
+        });
+      }
+    });
   };
 
   handleClose = () => {
@@ -218,28 +211,36 @@ class AddDialog extends React.Component {
   };
 
   render() {
-    const { open, classes } = this.props;
-    const {
-      showPassword, loader, snackCheck,
-    } = this.state;
+    const { editOpen, classes } = this.props;
+    const { form, loader, snackCheck } = this.state;
+    const { name, email } = form;
+    /*     let traineeName;
+    let traineeEmail;
+    trainee.forEach((train) => {
+      if (traineeId === train.id) {
+        traineeName = train.name;
+        traineeEmail = train.email;
+      }
+    }); */
     return (
       <>
         <Dialog
           fullWidth
           maxWidth="md"
-          open={open}
+          open={editOpen}
           onClose={this.handleClose}
           aria-labelledby="form-dialog-title"
         >
-          <DialogTitle id="form-dialog-title">Add Trainee</DialogTitle>
+          <DialogTitle id="form-dialog-title">Edit Trainee</DialogTitle>
           <DialogContent>
             <DialogContentText>
-                  Enter your trainee details
+                  Edit trainee details
             </DialogContentText>
             <TextField
               fullWidth
               id="outlined-name"
               label="Name"
+              value={name}
               error={this.showBooleanError('name')}
               className={classes.textField}
               margin="normal"
@@ -261,6 +262,7 @@ class AddDialog extends React.Component {
               className={classes.textField}
               type="email"
               name="email"
+              value={email}
               autoComplete="email"
               margin="normal"
               variant="outlined"
@@ -273,68 +275,6 @@ class AddDialog extends React.Component {
             <FormHelperText id="component-error-text2" className={classes.error}>
               {this.getError('email')}
             </FormHelperText>
-            <Grid container spacing={24}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  id="outlined-password-input"
-                  label="Password"
-                  error={this.showBooleanError('password')}
-                  className={classes.textField}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  margin="normal"
-                  variant="outlined"
-                  onChange={this.handleChange('password')}
-                  onBlur={this.handleOnBlur('password')}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <IconButton
-                          aria-label="Toggle password visibility"
-                          onClick={this.handleClickShowPassword}
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <FormHelperText id="component-error-text3" className={classes.error}>
-                  {this.getError('password')}
-                </FormHelperText>
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  id="outlined-password-input1"
-                  label="Confirm Password"
-                  error={this.showBooleanError('confirmPassword')}
-                  className={classes.textField}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  margin="normal"
-                  variant="outlined"
-                  onChange={this.handleChange('confirmPassword')}
-                  onBlur={this.handleOnBlur('confirmPassword')}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <IconButton
-                          aria-label="Toggle password visibility"
-                          onClick={this.handleClickShowPassword}
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <FormHelperText id="component-error-text4" className={classes.error}>
-                  {this.getError('confirmPassword')}
-                </FormHelperText>
-              </Grid>
-            </Grid>
           </DialogContent>
           <DialogActions>
             <Button onClick={this.handleClose} color="primary">
@@ -343,8 +283,9 @@ class AddDialog extends React.Component {
             <SnackbarConsumer>
               {value => (
                 <Button
-                  color="primary"
+                  type="submit"
                   disabled={(!this.buttonChecked() || loader)}
+                  color="primary"
                   onClick={(e) => {
                     this.handleSubmit(e, value);
                   }}

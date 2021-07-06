@@ -1,3 +1,6 @@
+import { getDateFormatted } from '../lib/utils';
+
+
 const PUBLIC_IMAGE_FOLDER = 'images/';
 export const DEFAULT_BANNER_IMAGE = 'images/default.png';
 
@@ -52,10 +55,27 @@ export const column = [
   {
     field: 'name',
     label: 'Name',
-    align: 'center',
   },
   {
     field: 'email',
     label: 'Email Address',
+    format: value => value && value.toUpperCase(),
+  },
+  {
+    field: 'createdAt',
+    label: 'Date',
+    align: 'right',
+    format: getDateFormatted,
   },
 ];
+
+/* export const actions = [
+  {
+    icon: <EditIcon />,
+    handler: TraineeList.handlerEditDialogOpen,
+  },
+  {
+    icon: <DeleteIcon />,
+    handler: TraineeList.handlerRemoveDialogOpen,
+  },
+]; */

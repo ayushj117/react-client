@@ -11,7 +11,7 @@ function Trainee(props) {
   return (
     <>
       <Switch>
-        <Route exact path={`${match.path}`} component={TraineeList} />
+        <Route exact path={`${match.path}`} {...props} component={TraineeList} />
         <Route exact path={`${match.path}/:id`} component={TraineeDetail} />
         <Route path={`${match.path}/`} component={NoMatch} />
       </Switch>
